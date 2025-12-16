@@ -33,6 +33,6 @@ MediaUnlockTest_Netflix
 
 case "$?" in
   0 ) echo -n -e "\r Netflix: Yes (Region: ${region1})\n" ;;
-  1 ) echo -n -e "\r Netflix: Originals Only (Region: ${region1}\n" ;;
+  1 ) echo -n -e "\r Netflix: Originals Only (Region: ${region1})\n" ;;
   * ) echo -n -e "\r Netflix: Failed\n"
 esac
