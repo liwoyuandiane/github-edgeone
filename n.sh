@@ -12,17 +12,25 @@ MediaUnlockTest_Netflix() {
 
   grep -q 'curl:' <<< $RESULT_2 && return 2
 
-  REGION_1=$(echo "$RESULT_1" | awk '
-    {
-      while (match($0, /"requestCountry":\{"supportedLocales":\[[^]]+\],"id":"([^"]+)"/, m)) {
-        cnt++
-        if (cnt == 2) {
-          print m[1]
-          exit
-        }
-        $0 = substr($0, RSTART + RLENGTH)
-      }
-    }')
+  REGION_1=$(awk '
+{
+  while (match($0, /"requestCountry":\{"supportedLocales":\[[^]]+\],"id":"[^"]+"/)) {
+    cnt++
+
+    block = substr($0, RSTART, RLENGTH)
+    id = block
+    sub(/.*"id":"*/, "", id)
+    sub(/".*/, "", id)
+
+    if (cnt == 2) {
+      print id
+      exit
+    }
+
+    $0 = substr($0, RSTART + RLENGTH)
+  }
+}
+' <<< "$RESULT_1")
 
   grep -q 'og:video' <<< "${RESULT_1}${RESULT_2}" && return 0 || return 1
 }
