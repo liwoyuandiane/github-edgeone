@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-grep -E '6|-6' <<< "$1" && MODE='-6' || MODE='-4'
+grep -qE '6|-6' <<< "$1" && MODE='-6' || MODE='-4'
 CURL_ARGS=$2
 
 MediaUnlockTest_Netflix() {
