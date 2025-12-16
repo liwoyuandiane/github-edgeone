@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+
+grep -E '6|-6' <<< "$1" && MODE='-6' || MODE='-4'
+curlArgs=$2
+
+UA_Browser="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36 Edg/112.0.1722.64"
+
+MediaUnlockTest_Netflix() {
+  tmpresult1=$(curl $curlArgs ${MODE} --user-agent "${UA_Browser}" -SsL --max-time 10 --tlsv1.3 "https://www.netflix.com/title/81280792" 2>&1 | grep -E 'curl:|og:video|requestCountry')
+
+  grep -q 'curl:' <<< $tmpresult1 && return 1
+  
+  tmpresult1=$(curl $curlArgs ${MODE} --user-agent "${UA_Browser}" -SsL --max-time 10 --tlsv1.3 "https://www.netflix.com/title/70143836" 2>&1 | grep -E 'curl:|og:video|requestCountry')
+
+  grep -q 'curl:' <<< $tmpresult1 && return 2
+
+  region1=$(echo "$tmpresult1" | awk '
+    {
+      while (match($0, /"requestCountry":\{"supportedLocales":\[[^]]+\],"id":"([^"]+)"/, m)) {
+        cnt++
+        if (cnt == 2) {
+          print m[1]
+          exit
+        }
+        $0 = substr($0, RSTART + RLENGTH)
+      }
+    }')
+
+  grep -q 'og:video' <<< "${tmpresult1}${tmpresult2}" && return 0 || return 1
+}
+
+MediaUnlockTest_Netflix
+
+case "$?" in
+  0 ) echo -n -e "\r Netflix: Yes (Region: ${region1})\n" ;;
+  1 ) echo -n -e "\r Netflix: Originals Only (Region: ${region1}\n" ;;
+  * ) echo -n -e "\r Netflix: Failed\n"
+esac
