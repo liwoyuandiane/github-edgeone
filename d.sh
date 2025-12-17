@@ -37,7 +37,7 @@ MediaUnlockTest_DisneyPlus() {
 
   local isUnavailable=$(grep -E 'preview.*unavailable' <<< $tmpresult)
 
-  local region=$(sed -n 's/.*"countryCode":[ ]*"\([^"]\+\)".*/\1/p' <<< "$tmpresult")
+  region=$(sed -n 's/.*"countryCode":[ ]*"\([^"]\+\)".*/\1/p' <<< "$tmpresult")
 
   local inSupportedLocation=$(sed -n 's/.*"inSupportedLocation":[ ]*\([^,]\+\),.*/\1/p' <<< "$tmpresult")
 
