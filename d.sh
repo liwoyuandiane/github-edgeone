@@ -2,40 +2,37 @@
 
 # Disney+ 检测函数
 MediaUnlockTest_DisneyPlus() {
-  # ========= 1. 获取设备注册的assertion =========
+  # ========== 1. 向Disney+设备注册接口发送请求，获取设备注册的assertion ==========
   local assertion=$(curl --user-agent "${UA_Browser}" -s --max-time 10 -X POST "https://disney.api.edge.bamgrid.com/devices" -H "authorization: Bearer ZGlzbmV5JmJyb3dzZXImMS4wLjA.Cu56AgSfBTDag5NiRA81oLHkDZfu5L3CKadnefEAY84" -H "content-type: application/json; charset=UTF-8" -d '{"deviceFamily":"browser","applicationRuntime":"chrome","deviceProfile":"windows","attributes":{}}' 2>&1 | sed 's/.*assertion":"\([^"]\+\)".*/\1/')
 
   grep -q 'curl:' <<< "$assertion" && return 1
 
-  # ========= 2. 获取Disney+的Cookie信息 =========
-  local Media_Cookie=$(curl -s --retry 3 --max-time 10 "https://raw.githubusercontent.com/1-stream/RegionRestrictionCheck/main/cookies" | sed -n '1p;8p' &)
+  # ========== 2. 构造获取token所需的参数内容 ==========
+  local disneycookie=$(sed "s/DISNEYASSERTION/${assertion}/g" <<< 'grant_type=urn%3Aietf%3Aparams%3Aoauth%3Agrant-type%3Atoken-exchange&latitude=0&longitude=0&platform=browser&subject_token=DISNEYASSERTION&subject_token_type=urn%3Abamtech%3Aparams%3Aoauth%3Atoken-type%3Adevice')
 
-  local PreDisneyCookie=$(sed -n '1p' <<< "$Media_Cookie")
-
-  local disneycookie=$(sed "s/DISNEYASSERTION/${assertion}/g" <<< "$PreDisneyCookie")
-
-  # ========= 3. 使用assertion获取token =========
+  # ========== 3. 使用构造好的参数向token接口发送请求，获取访问令牌 ==========
   local TokenContent=$(curl --user-agent "${UA_Browser}" -s --max-time 10 -X POST "https://disney.api.edge.bamgrid.com/token" -H "authorization: Bearer ZGlzbmV5JmJyb3dzZXImMS4wLjA.Cu56AgSfBTDag5NiRA81oLHkDZfu5L3CKadnefEAY84" -d "$disneycookie" 2>&1)
 
   grep -qE 'forbidden-location|403 ERROR' <<< "$TokenContent" && return 1
 
-  local fakecontent=$(sed -n '2p' <<< "$Media_Cookie")
-
+  # ========== 4. 从返回结果中提取refreshToken ==========
   local refreshToken=$(sed 's/.*"refresh_token":[ ]*"\([^"]\+\)".*/\1/' <<< "$TokenContent")
 
-  local disneycontent=$(sed "s/ILOVEDISNEY/${refreshToken}/g" <<< "$fakecontent")
+  # ========== 5. 构造GraphQL查询参数 ==========
+  local disneycontent=$(sed "s/ILOVEDISNEY/${refreshToken}/" <<< '{"query":"mutation refreshToken($input: RefreshTokenInput!) {\n            refreshToken(refreshToken: $input) {\n                activeSession {\n                    sessionId\n                }\n            }\n        }","variables":{"input":{"refreshToken":"ILOVEDISNEY"}}}')
 
-  # ========= 4. 使用token获取用户区域信息 =========
+  # ========== 6. 发送GraphQL查询请求，获取用户会话及区域信息 ==========
   local tmpresult=$(curl --user-agent "${UA_Browser}" -X POST -sSL --max-time 10 "https://disney.api.edge.bamgrid.com/graph/v1/device/graphql" -H "authorization: ZGlzbmV5JmJyb3dzZXImMS4wLjA.Cu56AgSfBTDag5NiRA81oLHkDZfu5L3CKadnefEAY84" -d "$disneycontent" 2>&1)
 
   grep -q 'curl:' <<< "$tmpresult" && return 1
 
-  # ========= 5. 检查预览页面 =========
+  # ========== 7. 访问Disney+主页，检查页面跳转情况 ==========
   local previewchecktmp=$(curl -s -o /dev/null -L --max-time 10 -w '%{url_effective}\n' "https://www.disneyplus.com")
 
   grep -q 'curl:' <<< "$previewchecktmp" && return 1
 
-  local isUnavailable=$(grep -E 'preview.*unavailable' <<< $tmpresult)
+  # ========== 8. 解析返回数据，提取区域信息和可用性状态 ==========
+  local isUnavailable=$(grep -E 'preview.*unavailable' <<< $previewchecktmp)
 
   region=$(sed -n 's/.*"countryCode":[ ]*"\([^"]\+\)".*/\1/p' <<< "$tmpresult")
 
